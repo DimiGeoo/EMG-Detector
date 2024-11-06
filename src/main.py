@@ -55,7 +55,7 @@ tunnel = SSHTunnelForwarder(
     ssh_username=ssh_user,
     ssh_password=ssh_password,
     remote_bind_address=(db_host, int(db_port)),
-    local_bind_address=("localhost", 5433),
+    local_bind_address=("localhost", 8000),
 )
 
 tunnel.start()
@@ -66,7 +66,7 @@ conn = psycopg2.connect(
     user=db_user,
     password=db_password,
     host="localhost",
-    port=5433,
+    port=8000,
 )
 cursor = conn.cursor()
 cursor.execute("SET search_path TO it185369;")
