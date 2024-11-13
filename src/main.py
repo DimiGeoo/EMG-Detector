@@ -1,10 +1,7 @@
-import asyncio
 import logging
 import ssl
 import psycopg2
 import paho.mqtt.client as mqtt
-from psycopg2.extras import RealDictCursor
-from sshtunnel import SSHTunnelForwarder
 from fastapi import FastAPI, HTTPException
 import os
 from dotenv import load_dotenv
@@ -16,72 +13,41 @@ load_dotenv()
 app = FastAPI()
 
 # Retrieve credentials from environment variables
-ssh_host = os.getenv("SSH_HOST")
-ssh_user = os.getenv("SSH_USER")
-ssh_password = os.getenv("SSH_PASSWORD")
-db_host = os.getenv("DB_HOST")
-db_port = os.getenv("DB_PORT")
-db_name = os.getenv("DB_NAME")
-db_user = os.getenv("DB_USER")
-db_password = os.getenv("DB_PASSWORD")
 mqtt_broker = os.getenv("MQTT_BROKER")
 mqtt_port = os.getenv("MQTT_PORT")
 mqtt_username = os.getenv("MQTT_USERNAME")
 mqtt_password = os.getenv("MQTT_PASSWORD")
 mqtt_topic = "#"
+connection_uri = os.getenv("DATABASE_URL")  # in .env
 
 # Check if required environment variables are set
 required_env_vars = [
-    ssh_host,
-    ssh_user,
-    ssh_password,
-    db_host,
-    db_port,
-    db_name,
-    db_user,
-    db_password,
     mqtt_broker,
     mqtt_port,
     mqtt_username,
     mqtt_password,
+    connection_uri,
 ]
 
 if any(var is None for var in required_env_vars):
     raise ValueError("One or more required environment variables are missing.")
 
-# Establish SSH tunnel to PostgreSQL database
-tunnel = SSHTunnelForwarder(
-    ssh_host,
-    ssh_username=ssh_user,
-    ssh_password=ssh_password,
-    remote_bind_address=(db_host, int(db_port)),
-    local_bind_address=("localhost", 8000),
-)
-
-tunnel.start()
-
-# Connect to PostgreSQL
-conn = psycopg2.connect(
-    dbname=db_name,
-    user=db_user,
-    password=db_password,
-    host="localhost",
-    port=8000,
-)
+# Database connection setup
+conn = psycopg2.connect(connection_uri)
 cursor = conn.cursor()
-cursor.execute("SET search_path TO it185369;")
+cursor.execute("SET search_path TO public;")
 
 # Create the mqtt_messages table if it doesn't exist
 cursor.execute(
     """
-    CREATE TABLE IF NOT EXISTS mqtt_messages (
+    CREATE TABLE IF NOT EXISTS public.mqtt_messages (
         id SERIAL PRIMARY KEY,
         topic TEXT,
         message TEXT,
         qos INTEGER,
         retain BOOLEAN
     )
-"""
+    """
 )
 conn.commit()
 
@@ -96,7 +62,7 @@ def on_message(client, userdata, msg):
             """
             INSERT INTO mqtt_messages (topic, message, qos, retain)
             VALUES (%s, %s, %s, %s)
-        """,
+            """,
             (msg.topic, msg.payload.decode(), msg.qos, msg.retain),
         )
         conn.commit()
@@ -120,9 +86,7 @@ def mqtt_connect():
             logging.error(f"Failed to connect, return code {rc}")
 
     client.on_connect = on_connect
-    client.tls_set(
-        ca_certs=None, certfile=None, keyfile=None, tls_version=ssl.PROTOCOL_TLSv1_2
-    )
+    client.tls_set(tls_version=ssl.PROTOCOL_TLSv1_2)
 
     try:
         client.connect(mqtt_broker, int(mqtt_port), 60)
@@ -154,6 +118,5 @@ async def get_messages():
 # Cleanup on shutdown
 @app.on_event("shutdown")
 def shutdown():
-    tunnel.stop()
     conn.close()
-    print("SSH tunnel and database connection closed")
+    print("Database connection closed")
