@@ -11,7 +11,7 @@ Details on using the MQTT server with Docker, utilizing the Mosquitto MQTT broke
 ### Build the Docker Image
 
 ```bash
-cd D:/GitHub/git/Personal/EMG-Detector/MQTT_Server
+cd D:/GitHub/git/Personal/EMG-Detector/docker/MQTT_Server
 docker build -t emg_mqtt .
 ```
 
@@ -20,14 +20,14 @@ docker build -t emg_mqtt .
 ### Start the MQTT Server
 
 ```bash
-docker run -d --name emg_mqtt_container \
-    -p 1883:1883 \
-    -v D:/GitHub/git/Personal/EMG-Detector/MQTT_Server/data:/mosquitto/data \
-    -v D:/GitHub/git/Personal/EMG-Detector/MQTT_Server/log:/mosquitto/log \
-    emg_mqtt
+docker run -d --name emg_mqtt_container `
+  -p 1883:1883 `
+  -v ${PWD}\data:/mosquitto/data `
+  -v ${PWD}\log:/mosquitto/log `
+  emg_mqtt
 ```
 ```
-docker run -d --name emg_mqtt_container  -p 1883:1883  -v D:/GitHub/git/Personal/EMG-Detector/MQTT_Server/data:/mosquitto/data  -v D:/GitHub/git/Personal/EMG-Detector/MQTT_Server/log:/mosquitto/log  emg_mqtt
+docker run -d --name emg_mqtt_container -p 1883:1883 -v ${PWD}/data:/mosquitto/data -v ${PWD}/log:/mosquitto/log emg_mqtt
 ```
 
 ### Restart the Server
