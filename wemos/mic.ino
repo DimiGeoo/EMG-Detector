@@ -2,14 +2,17 @@
 #include <PubSubClient.h>
 
 // Wi-Fi credentials
-const char* ssid = "*****";        // Replace with your Wi-Fi SSID
-const char* password = "*****"; // Replace with your Wi-Fi Password
+const char* ssid = "HUAWEI-HOME";        
+const char* password = "2310616137"; 
 
 // MQTT Broker details
-const char* mqttServer = "192.168.1.18";
+const char* mqttServer = "192.168.1.5";
 const int mqttPort = 1883;                
 const char* mqttUser = "Dimitris";      
-const char* mqttPassword = "*****"; 
+const char* mqttPassword = "Dimitris"; 
+
+const int detect_plus = D0;  
+const int detect_minus = D1; 
 
 // Topics
 const char* mqttTopic = "emg/sensor";     
@@ -23,7 +26,8 @@ PubSubClient client(espClient);
 void setup() {
   // Start serial communication
   Serial.begin(19200);
-  
+  pinMode(detect_plus, INPUT); // Setup for leads off detection LO +
+  pinMode(detect_minus, INPUT); // Setup for leads off detection LO - 
   // Connect to Wi-Fi
   WiFi.begin(ssid, password);
   Serial.print("Connecting to Wi-Fi");
@@ -42,6 +46,7 @@ void setup() {
     } else {
       Serial.print("Failed, rc=");
       Serial.print(client.state());
+
       delay(2000);
     }
   }
@@ -54,20 +59,23 @@ void loop() {
   }
   client.loop();
 
-  int emgValue = analogRead(emgPin);
-
-  // Publish the EMG value
-  String emgValueStr = String(emgValue);
-  client.publish(mqttTopic, emgValueStr.c_str());
-  Serial.println(emgValue);
-
+  if((digitalRead(detect_plus) == 1)||(digitalRead(detect_minus) == 1)){
+    Serial.println("Not Connected");
+    delay(1000);
+  }
+  else{
+  // send the value of analog input 0:
+    client.publish(mqttTopic,  String(analogRead(emgPin)).c_str());
+  }
 }
 
 void reconnect() {
   // Reconnect to MQTT Broker
   while (!client.connected()) {
     Serial.print("Attempting MQTT connection...");
-    if (client.connect("EMGClient", mqttUser, mqttPassword)) {
+    String clientId = "EMGClient-" + String(random(0xffff), HEX);
+
+    if (client.connect(clientId.c_str(), mqttUser, mqttPassword)) {
       Serial.println("Connected to MQTT broker");
     } else {
       Serial.print("Failed, rc=");
