@@ -2,6 +2,8 @@
 */MQTT_Server/data/
 */MQTT_Server/data/
 */MQTT_Server/config/*.passwd
+/Screenshots
+/MachineLearning/Binary_models/*.pkl
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
