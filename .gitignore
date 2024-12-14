@@ -4,7 +4,7 @@
 */MQTT_Server/config/*.passwd
 /Screenshots
 /MachineLearning/Binary_models/*.pkl
-
+/MachineLearning/RealTimeTesting
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
