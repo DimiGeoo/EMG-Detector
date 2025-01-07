@@ -28,7 +28,7 @@ latest_classification = {}
 mqtt_connected = False
 mqtt_data_received = False
 last_message_time = 0
-MESSAGE_TIMEOUT = 2
+MESSAGE_TIMEOUT = 1
 
 mqtt_broker = "localhost"
 mqtt_topic = "#"
@@ -109,22 +109,27 @@ async def websocket_endpoint(websocket: WebSocket):
         await websocket.close()
 
 
-app.mount("/static", StaticFiles(directory="src/static"), name="static")
-
-
 html_content = """<!DOCTYPE html>
 <html>
 <head>
     <title>Real-Time Classification</title>
-    <link rel="stylesheet" type="text/css" href="/static/styles.css">
-
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
 </head>
 <body>
-    <div class="container">
-        <div id="status" class="status disconnected">Disconnected</div>
-        <h1>Real-Time Classification</h1>
-        <div id="class-display">
-            <p>Waiting for classification data...</p>
+    <div class="container mt-5">
+        <!-- Status Indicator -->
+        <div id="status" class="alert alert-danger text-center" role="alert">
+            Disconnected
+        </div>
+
+        <!-- Page Title -->
+        <h1 class="text-center mb-4">Real-Time Classification</h1>
+
+        <!-- Classification Display -->
+        <div id="class-display" class="text-center p-4 border rounded shadow-sm">
+            <p class="text-muted">Waiting for classification data...</p>
         </div>
     </div>
 
@@ -148,12 +153,12 @@ html_content = """<!DOCTYPE html>
                 previousConnectedState = connected;
                 if (connected) {
                     statusDiv.textContent = "Connected";
-                    statusDiv.className = "status connected";
-                    classDisplay.style.display = "block";  // Show class display when connected
+                    statusDiv.className = "alert alert-success text-center"; // Bootstrap alert for success
+                    classDisplay.style.display = "block"; // Show class display when connected
                 } else {
                     statusDiv.textContent = "Disconnected";
-                    statusDiv.className = "status disconnected";
-                    classDisplay.style.display = "none";  // Hide class display when disconnected
+                    statusDiv.className = "alert alert-danger text-center"; // Bootstrap alert for danger               
+                    classDisplay.innerHTML = `<p class="text-muted">Waiting for classification data...</p>`;
                 }
             }
         }
@@ -162,13 +167,13 @@ html_content = """<!DOCTYPE html>
             const display = document.getElementById("class-display");
             if (classData && classData.name && classData.image) {
                 display.innerHTML = `
-                    <div class="class-info">
-                        <img src="${classData.image}" alt="${classData.name}">
-                        <h2>${classData.name}</h2>
+                    <div class="d-flex flex-column align-items-center">
+                        <img src="${classData.image}" alt="${classData.name}" class="img-fluid rounded mb-3">
+                        <h2 class="fw-bold">${classData.name}</h2>
                     </div>
                 `;
             } else {
-                display.innerHTML = "<p>Unknown classification</p>";
+                display.innerHTML = "<p class='text-muted'>Unknown classification</p>";
             }
         }
     </script>
