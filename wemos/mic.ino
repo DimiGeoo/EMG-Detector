@@ -2,19 +2,19 @@
 #include <PubSubClient.h>
 
 // Wi-Fi credentials
-const char* ssid = "HUAWEI-HOME";        
-const char* password = "2310616137"; 
+const char* ssid = "D*******";        
+const char* password = "D*******"; 
 
 // MQTT Broker details
-const char* mqttServer = "192.168.1.5";
+const char* mqttServer = "192.168.1.5";  // IP Address of the MQTT Broker
 const int mqttPort = 1883;                
-const char* mqttUser = "Dimitris";      
-const char* mqttPassword = "Dimitris"; 
+const char* mqttUser = "D*******";      
+const char* mqttPassword = "D*******"; 
 
 const int detect_plus = D0;  
 const int detect_minus = D1; 
 
-// Topics
+// Topic
 const char* mqttTopic = "emg/sensor";     
 
 // EMG Sensor Pin
@@ -26,8 +26,9 @@ PubSubClient client(espClient);
 void setup() {
   // Start serial communication
   Serial.begin(19200);
-  pinMode(detect_plus, INPUT); // Setup for leads off detection LO +
-  pinMode(detect_minus, INPUT); // Setup for leads off detection LO - 
+  pinMode(detect_plus, INPUT); 
+  pinMode(detect_minus, INPUT); 
+
   // Connect to Wi-Fi
   WiFi.begin(ssid, password);
   Serial.print("Connecting to Wi-Fi");
@@ -64,8 +65,8 @@ void loop() {
     delay(1000);
   }
   else{
-  // send the value of analog input 0:
-    client.publish(mqttTopic,  String(analogRead(emgPin)).c_str());
+  // Send the value of Sensor to MQTT Broker
+    client.publish(mqttTopic,  String(analogRead(emgPin)).c_str(),true,1); //QoS 1
   }
 }
 
