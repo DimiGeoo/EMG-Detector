@@ -66,7 +66,7 @@ void loop() {
   }
   else{
   // Send the value of Sensor to MQTT Broker
-    client.publish(mqttTopic,  String(analogRead(emgPin)).c_str(),true,1); //QoS 1
+    client.publish(mqttTopic,  String(analogRead(emgPin)).c_str());
   }
 }
 
