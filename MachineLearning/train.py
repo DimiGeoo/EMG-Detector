@@ -1,6 +1,6 @@
 """
 This file is responsible for collecting labeled data from MQTT messages and saving it to a CSV file
-Input is the label and tracking for 3 minites repeatedly.
+Input is the label and tracking for X  minites repeatedly.
 """
 
 import csv
@@ -13,6 +13,8 @@ import paho.mqtt.client as mqtt
 # Load environment variables from .env file
 load_dotenv()
 
+MINITES = 10
+
 # MQTT connection details from environment variables
 MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_PORT", 1883))
@@ -20,8 +22,7 @@ MQTT_USERNAME = os.getenv("MQTT_USERNAME")
 MQTT_PASSWORD = os.getenv("MQTT_PASSWORD")
 TOPIC = os.getenv("MQTT_TOPIC", "#")
 
-# CSV_FILE = "MachineLearning/Datasets/labeled_data.csv"
-CSV_FILE = "MachineLearning/Datasets/labeled_data_1.csv"
+CSV_FILE = "MachineLearning/Datasets/labeled_data.csv"
 CSV_HEADERS = ["target", "feature"]
 
 # Global variables
@@ -60,14 +61,14 @@ def initialize_csv():
         print(f"CSV file already exists: {CSV_FILE}")
 
 
-# Collect data for a label and write to CSV after 3 Minites
+# Collect data for a label and write to CSV after {Minites} Minites
 def collect_and_save_label(label):
     global data_buffer
     labeled_data = []
-    print(f"Collecting data for label '{label}' for 3 minites.")
+    print(f"Collecting data for label '{label}' for{MINITES} minites.")
 
     start_time = time.time()
-    while time.time() - start_time < 60 * 3:
+    while time.time() - start_time < 60 * MINITES:
         with lock:
             labeled_data.extend(data_buffer)
             data_buffer.clear()
@@ -93,7 +94,7 @@ def main():
     if MQTT_USERNAME and MQTT_PASSWORD:
         client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
 
-    client.connect(MQTT_BROKER, MQTT_PORT, 60 * 3)  # 3 minutes timeout
+    client.connect(MQTT_BROKER, MQTT_PORT, 60 * MINITES)
     client.subscribe(TOPIC)
     client.loop_start()
 
@@ -102,7 +103,7 @@ def main():
     try:
         while True:
             label = input(
-                "Enter the label for the next 3 minites (or type 'exit' to stop): "
+                f"Enter the label for the next {MINITES} minites (or type 'exit' to stop): "
             ).strip()
             if label.lower() == "exit":
                 break
