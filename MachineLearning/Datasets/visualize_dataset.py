@@ -1,41 +1,34 @@
-""" Visualize each class of CSV into a plot. """
-
-import csv
+import os
+import pandas as pd
 import matplotlib.pyplot as plt
-from collections import defaultdict
+from scipy.signal import butter, filtfilt
 
-# CSV_FILE = "MachineLearning/Datasets/labeled_data.csv"
-CSV_FILE = "MachineLearning/Datasets/labeled_data_1.csv"
-
-
-# Read the CSV and group values by label
-def read_and_group_data(csv_file):
-    label_data = defaultdict(list)
-    try:
-        with open(csv_file, mode="r") as file:
-            reader = csv.DictReader(file)
-            for row in reader:
-                label = row["target"]
-                value = float(row["feature"])
-                label_data[label].append(value)
-    except FileNotFoundError:
-        print(f"File not found: {csv_file}")
-    return label_data
+# Path to your folder containing the CSV files
+folder_path = "./MachineLearning/Datasets/New"
 
 
-# Plot all classes
-def visualize_gestures_with_subplots(label_data):
-    labels = list(label_data.keys())
-    num_gestures = len(labels)
+# Plot gestures for each class
+def visualize_gestures(data):
+    classes = data["target"].unique()  # Get unique class labels
+    num_classes = len(classes)
 
-    plt.figure(figsize=(12, 8))  # Set window size big enough for the classes
+    plt.figure(
+        figsize=(12, num_classes * 4)
+    )  # Adjust height based on the number of classes
 
-    for i, (label, values) in enumerate(label_data.items(), start=1):
-        plt.subplot(num_gestures, 1, i)  # Create subplots in a column
-        plt.plot(range(len(values)), values, label=label, color="C" + str(i))
-        plt.title(f"Gesture: {label}")
+    for i, class_label in enumerate(classes, start=1):
+        class_data = data[data["target"] == class_label]["feature"].values
+        filtered_data = class_data
+        plt.subplot(num_classes, 1, i)
+        plt.plot(
+            range(len(filtered_data)),
+            filtered_data,
+            label=f"Class: {class_label}",
+            color=f"C{i}",
+        )
+        plt.title(f"Gesture: {class_label}")
         plt.xlabel("Index")
-        plt.ylabel("Value")
+        plt.ylabel("Filtered Value")
         plt.legend()
         plt.grid(True)
 
@@ -43,12 +36,30 @@ def visualize_gestures_with_subplots(label_data):
     plt.show()
 
 
+# Main function
 def main():
-    label_data = read_and_group_data(CSV_FILE)
-    if label_data:
-        visualize_gestures_with_subplots(label_data)
+    # List all CSV files in the folder
+    csv_files = [f for f in os.listdir(folder_path) if f.endswith(".csv")]
+
+    # Load and combine all CSV files
+    df_list = []
+    for file in csv_files:
+        file_path = os.path.join(folder_path, file)
+        df = pd.read_csv(file_path)
+        df_list.append(df)
+
+    # Combine all DataFrames into one
+    if df_list:
+        data = pd.concat(df_list, ignore_index=True)
+
+        # Ensure the "feature" column is numeric
+        data["feature"] = pd.to_numeric(data["feature"], errors="coerce")
+        data.dropna(subset=["feature"], inplace=True)
+
+        # Visualize gestures
+        visualize_gestures(data)
     else:
-        print("No data to visualize.")
+        print("No CSV files found in the specified folder.")
 
 
 if __name__ == "__main__":

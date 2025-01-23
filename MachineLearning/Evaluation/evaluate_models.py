@@ -1,52 +1,67 @@
-from sklearn.neural_network import MLPClassifier
-from sklearn.svm import SVC  # SVM Classifier
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
-from sklearn.ensemble import (
-    AdaBoostClassifier,
-    BaggingClassifier,
-    RandomForestClassifier,
-    GradientBoostingClassifier,
-)
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.linear_model import LogisticRegression, RidgeClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, classification_report
+from sklearn.model_selection import train_test_split, StratifiedKFold, GridSearchCV
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from sklearn.preprocessing import StandardScaler
 import pandas as pd
 import numpy as np
 from scipy.fftpack import fft
 import joblib
 from sklearn.tree import DecisionTreeClassifier
+from sklearn.svm import SVC
+from sklearn.ensemble import (
+    RandomForestClassifier,
+    GradientBoostingClassifier,
+    AdaBoostClassifier,
+    BaggingClassifier,
+)
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.linear_model import LogisticRegression, RidgeClassifier
+from sklearn.neural_network import MLPClassifier
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+import matplotlib.pyplot as plt
+import seaborn as sns
+import os
 
-# Step 1: Load EMG data from a CSV file
-# data = pd.read_csv("MachineLearning/Datasets/labeled_data.csv")
-data = pd.read_csv("MachineLearning/Datasets/labeled_data_1.csv")
-excluded_classes = []
+# Load data
+import pandas as pd
+import os
+
+# Path to your folder containing the CSV files
+folder_path = "./MachineLearning/Datasets/New"
+
+# List all CSV files in the folder
+csv_files = [f for f in os.listdir(folder_path) if f.endswith(".csv")]
+
+# Initialize an empty list to store dataframes
+df_list = []
+
+# Loop through each CSV file, read it, and append to the list
+for file in csv_files:
+    file_path = os.path.join(folder_path, file)
+    df = pd.read_csv(file_path)
+    df_list.append(df)
+
+# Combine all dataframes into one
+data = pd.concat(df_list, ignore_index=True)
+excluded_classes = ["paramesos", "peace"]
 data = data[~data["target"].isin(excluded_classes)]
 
 
-# Step 2: Create a function to process a window of data and extract features
+# Feature extraction
 def process_window(window):
-    rms = np.sqrt(np.mean(np.square(window)))  # Root Mean Square (RMS)
-    mav = np.mean(np.abs(window))  # Mean Absolute Value (MAV)
-    zc = np.sum(np.diff(np.sign(window)) != 0)  # Zero Crossing (ZC)
-    wl = np.sum(np.abs(np.diff(window)))  # Waveform Length (WL)
+    rms = np.sqrt(np.mean(np.square(window)))  # Root Mean Square
+    mav = np.mean(np.abs(window))  # Mean Absolute Value
+    wl = np.sum(np.abs(np.diff(window)))  # Waveform Length
 
-    # Frequency feature: FFT dominant frequency
-    fft_vals = fft(window)
-    fft_power = np.abs(fft_vals[: len(fft_vals) // 2])
-    dominant_freq = np.argmax(fft_power)  # Dominant frequency index
-
-    return [rms, mav, zc, wl, dominant_freq]
+    return [rms, mav, wl]
 
 
-# Step 3: Define a window size and step size (200 ms with 50% overlap)
-sampling_rate = 1000  # in Hz (samples per second)
-window_duration_seconds = 0.5  # 500 ms
-window_size = int(sampling_rate * window_duration_seconds)  # Convert to samples
-step_size = window_size // 2  # 50% overlap
+# Windowing parameters
+sampling_rate = 1860  # in Hz
+window_duration_seconds = 1  # 1 sec
+window_size = int(sampling_rate * window_duration_seconds)
+step_size = window_size
 
-# Step 4: Segment the data into windows and extract features
+# Segment the data
 features = []
 labels = []
 
@@ -58,41 +73,30 @@ for start in range(0, len(data), step_size):
     features.append(process_window(window))
     labels.append(data["target"].iloc[start])
 
-# Step 5: Convert the features into a DataFrame
+# Create DataFrame for features and labels
 features_df = pd.DataFrame(
-    features, columns=["RMS", "MAV", "ZC", "WL", "Dominant_Freq"]
+    features,
+    columns=[
+        "RMS",
+        "MAV",
+        "WL",
+    ],
 )
 features_df["target"] = labels
 
-# Step 6: Split the data into features (X) and target (y)
+# Split data
 X = features_df.drop("target", axis=1)
 y = features_df["target"]
-
-# Standardize the features
 scaler = StandardScaler()
 X = scaler.fit_transform(X)
 
-# Step 7: Split the data into training and testing sets
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.15, random_state=42
-)
+# Split into training and test sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.15)
 
-
-# Step 8: Train and evaluate multiple models
-def evaluate_model(model, model_name):
-    model.fit(X_train, y_train)
-    y_pred = model.predict(X_test)
-    accuracy = accuracy_score(y_test, y_pred)
-    print(f"\nModel: {model_name}")
-    print(f"Accuracy: {accuracy:.2f}")
-    print("Classification Report:")
-    print(classification_report(y_test, y_pred))
-    return model
-
-
-# Initialize and evaluate models
+# Initialize models
 models = {
     "LDA": LinearDiscriminantAnalysis(),
+    "SVM (Linear)": SVC(kernel="linear", random_state=42),
     "SVM (RBF)": SVC(kernel="rbf", random_state=42),
     "Random Forest": RandomForestClassifier(n_estimators=100, random_state=42),
     "Gradient Boosting": GradientBoostingClassifier(n_estimators=100, random_state=42),
@@ -111,17 +115,62 @@ models = {
     "Decision Tree": DecisionTreeClassifier(random_state=42),
 }
 
+# Create directory for confusion matrices
+os.makedirs("MachineLearning/conf_matrix", exist_ok=True)
+
+
+# Perform cross-validation and hyperparameter tuning
+def evaluate_model(model, model_name):
+    # Cross-validation setup
+    cv = StratifiedKFold(n_splits=10, shuffle=True, random_state=42)
+
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+    accuracy = accuracy_score(y_test, y_pred)
+
+    print(f"\nModel: {model_name}")
+    print(f"Accuracy: {accuracy:.2f}")
+    print("Classification Report:")
+    print(classification_report(y_test, y_pred))
+
+    # Confusion matrix
+    cm = confusion_matrix(y_test, y_pred)
+    plt.figure(figsize=(10, 7))
+    sns.heatmap(
+        cm,
+        annot=True,
+        fmt="d",
+        cmap="Blues",
+        xticklabels=np.unique(y),
+        yticklabels=np.unique(y),
+    )
+    plt.title(f"Confusion Matrix for {model_name}")
+    plt.xlabel("Predicted")
+    plt.ylabel("Actual")
+    plt.savefig(
+        f"MachineLearning/conf_matrix/{model_name.replace(' ', '_').lower()}_conf_matrix.png"
+    )
+    plt.close()
+
+    return model
+
+
+# Train and evaluate each model
 trained_models = {}
 
 print("\n--- Model Evaluation Results ---")
 for model_name, model in models.items():
     trained_models[model_name] = evaluate_model(model, model_name)
 
-# Step 9: Save all trained models
+# Save the models
 print("\n--- Saving Trained Models ---")
 for model_name, model in trained_models.items():
     filename = f"MachineLearning/Binary_models/{model_name.replace(' ', '_').lower()}_model.pkl"
-    joblib.dump(model, filename)
+    joblib.dump(model, filename, compress=3)  # Compress to level 3
     print(f"{model_name} saved as {filename}")
 
+joblib.dump(scaler, "MachineLearning/Binary_models/scaler.pkl")
 print("\nAll models trained, evaluated, and saved successfully!")
+features_df.to_csv(
+    "MachineLearning/Datasets/121221processed_features_dataset.csv", index=False
+)
