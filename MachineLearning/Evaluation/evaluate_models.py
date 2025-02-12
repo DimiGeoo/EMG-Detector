@@ -1,47 +1,42 @@
-from sklearn.model_selection import train_test_split, StratifiedKFold, GridSearchCV
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
-from sklearn.preprocessing import StandardScaler
+# Built-in Python Libraries
+import os
+
+# Data Manipulation and Processing Libraries
 import pandas as pd
 import numpy as np
-from scipy.fftpack import fft
-import joblib
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.svm import SVC
-from sklearn.ensemble import (
-    RandomForestClassifier,
-    GradientBoostingClassifier,
-    AdaBoostClassifier,
-    BaggingClassifier,
+from sklearn.preprocessing import StandardScaler
+
+# Machine Learning Libraries
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import (
+    accuracy_score,
+    classification_report,
+    confusion_matrix,
+    f1_score,
+    precision_score,
+    recall_score,
 )
+from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.linear_model import LogisticRegression, RidgeClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+
+# Saving and Loading Models
+import joblib
+
+# Visualization Libraries
 import matplotlib.pyplot as plt
 import seaborn as sns
-import os
-
-# Load data
-import pandas as pd
-import os
 
 # Path to your folder containing the CSV files
-folder_path = "./MachineLearning/Datasets/New"
-
-# List all CSV files in the folder
-csv_files = [f for f in os.listdir(folder_path) if f.endswith(".csv")]
-
-# Initialize an empty list to store dataframes
-df_list = []
-
-# Loop through each CSV file, read it, and append to the list
-for file in csv_files:
-    file_path = os.path.join(folder_path, file)
-    df = pd.read_csv(file_path)
-    df_list.append(df)
+csv_path = "./MachineLearning/Datasets/dataset.csv"
+conf_matrix_path = "./MachineLearning/conf_matrix"
+models_path = "./MachineLearning/Binary_Models"
+dataset_path = "./MachineLearning/Datasets"
 
 # Combine all dataframes into one
-data = pd.concat(df_list, ignore_index=True)
+data = pd.read_csv(csv_path)
 excluded_classes = ["paramesos", "peace"]
 data = data[~data["target"].isin(excluded_classes)]
 
@@ -57,7 +52,7 @@ def process_window(window):
 
 # Windowing parameters
 sampling_rate = 1860  # in Hz
-window_duration_seconds = 1  # 1 sec
+window_duration_seconds = 1.3  # 1 sec
 window_size = int(sampling_rate * window_duration_seconds)
 step_size = window_size
 
@@ -95,41 +90,45 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.15)
 
 # Initialize models
 models = {
-    "LDA": LinearDiscriminantAnalysis(),
-    "SVM (Linear)": SVC(kernel="linear", random_state=42),
+    "MLP_10_10": MLPClassifier(
+        hidden_layer_sizes=(10, 10), max_iter=500, random_state=42
+    ),
     "SVM (RBF)": SVC(kernel="rbf", random_state=42),
     "Random Forest": RandomForestClassifier(n_estimators=100, random_state=42),
-    "Gradient Boosting": GradientBoostingClassifier(n_estimators=100, random_state=42),
+    "SVM (RBF)": SVC(kernel="linear", random_state=42),
     "KNN": KNeighborsClassifier(n_neighbors=5),
-    "Logistic Regression": LogisticRegression(max_iter=1000, random_state=42),
-    "Neural Network (MLP)": MLPClassifier(
-        hidden_layer_sizes=(128, 64),
-        activation="relu",
-        solver="adam",
-        max_iter=500,
-        random_state=42,
+    "SVM Linear": SVC(kernel="linear", random_state=42),
+    "LDA": LinearDiscriminantAnalysis(
+        solver="lsqr",
+        tol=1e-3,
     ),
-    "AdaBoost": AdaBoostClassifier(n_estimators=100, random_state=42),
-    "Bagging Classifier": BaggingClassifier(n_estimators=100, random_state=42),
-    "Ridge Classifier": RidgeClassifier(random_state=42),
-    "Decision Tree": DecisionTreeClassifier(random_state=42),
+    # More algorithms to test
+    # "Perceptron": Perceptron(),
+    # "Logistic Regression": LogisticRegression(),
+    # "AdaBoost": AdaBoostClassifier(),
+    # "Bagging Classifier": BaggingClassifier(),
+    # "Ridge Classifier": RidgeClassifier(),
+    # "LDA": LinearDiscriminantAnalysis(),
 }
 
-# Create directory for confusion matrices
-os.makedirs("MachineLearning/conf_matrix", exist_ok=True)
+os.makedirs(conf_matrix_path, exist_ok=True)
+os.makedirs(models_path, exist_ok=True)
 
 
 # Perform cross-validation and hyperparameter tuning
 def evaluate_model(model, model_name):
-    # Cross-validation setup
-    cv = StratifiedKFold(n_splits=10, shuffle=True, random_state=42)
-
     model.fit(X_train, y_train)
     y_pred = model.predict(X_test)
     accuracy = accuracy_score(y_test, y_pred)
+    recall = recall_score(y_test, y_pred, average="macro")
+    precision = precision_score(y_test, y_pred, average="macro")
+    f1 = f1_score(y_test, y_pred, average="macro")
 
     print(f"\nModel: {model_name}")
     print(f"Accuracy: {accuracy:.2f}")
+    print(f"Recall: {recall:.2f}")
+    print(f"Precision: {precision:.2f}")
+    print(f"F1 Score: {f1:.2f}")
     print("Classification Report:")
     print(classification_report(y_test, y_pred))
 
@@ -147,9 +146,7 @@ def evaluate_model(model, model_name):
     plt.title(f"Confusion Matrix for {model_name}")
     plt.xlabel("Predicted")
     plt.ylabel("Actual")
-    plt.savefig(
-        f"MachineLearning/conf_matrix/{model_name.replace(' ', '_').lower()}_conf_matrix.png"
-    )
+    plt.savefig(f"{conf_matrix_path}/{model_name.replace(' ', '_').lower()}.png")
     plt.close()
 
     return model
@@ -165,12 +162,11 @@ for model_name, model in models.items():
 # Save the models
 print("\n--- Saving Trained Models ---")
 for model_name, model in trained_models.items():
-    filename = f"MachineLearning/Binary_models/{model_name.replace(' ', '_').lower()}_model.pkl"
+    filename = f"{models_path}/{model_name.replace(' ', '_').lower()}_model.pkl"
     joblib.dump(model, filename, compress=3)  # Compress to level 3
     print(f"{model_name} saved as {filename}")
 
-joblib.dump(scaler, "MachineLearning/Binary_models/scaler.pkl")
+joblib.dump(scaler, f"{models_path}/scaler.pkl")
 print("\nAll models trained, evaluated, and saved successfully!")
-features_df.to_csv(
-    "MachineLearning/Datasets/121221processed_features_dataset.csv", index=False
-)
+# Save the features after extraction
+features_df.to_csv(f"{dataset_path}/dataset_extracted.csv", index=False)

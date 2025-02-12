@@ -1,41 +1,47 @@
+# FastAPI Libraries
 from fastapi import FastAPI, WebSocket
 from fastapi.responses import HTMLResponse
-import asyncio, joblib, time, os
+from fastapi.staticfiles import StaticFiles
+
+# Python Built-in Libraries
+import asyncio
+import time
+
+# Data Manipulation and Processing Libraries
 import numpy as np
-import paho.mqtt.client as mqtt
+import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
-# FastAPI App
+# Loading Models
+import joblib
+
+# MQTT Communication Library
+import paho.mqtt.client as mqtt
+
+
 app = FastAPI()
+app.mount("/static", StaticFiles(directory="src/static"), name="static")
+
 
 # Class mapping for classification results
 class_mapping = {
-    "peace": {
-        "name": "peace",
-        "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQYcFlwRxQnvJGufTMBqIOhy2CvUiy06p-Mew&s",
-    },
     "rest": {
         "name": "rest",
-        "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQYcFlwRxQnvJGufTMBqIOhy2CvUiy06p-Mew&s",
-    },
-    "axristo_dakilo": {
-        "name": "axristo_dakilo",
-        "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQYcFlwRxQnvJGufTMBqIOhy2CvUiy06p-Mew&s",
+        "image": "http://localhost:8000/static/rest.png",
     },
     "mesaio": {
         "name": "mesaio",
-        "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQYcFlwRxQnvJGufTMBqIOhy2CvUiy06p-Mew&s",
+        "image": "http://localhost:8000/static/mesaio.png",
     },
     "mikro": {
         "name": "mikro",
-        "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQYcFlwRxQnvJGufTMBqIOhy2CvUiy06p-Mew&s",
+        "image": "http://localhost:8000/static/mikro.png",
     },
     "mpounia": {
         "name": "mpounia",
-        "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQYcFlwRxQnvJGufTMBqIOhy2CvUiy06p-Mew&s",
+        "image": "http://localhost:8000/static/mpounia.png",
     },
 }
-
 # Global variables
 buffer = []
 latest_classification = {}
@@ -46,9 +52,8 @@ MESSAGE_TIMEOUT = 1
 
 # Useful Paths
 html_file_path = "./src/html/frontent.html"
-model_path = "./MachineLearning/Binary_models/neural_network_(mlp)_model.pkl"
-scaler_path = "./MachineLearning/Binary_models/scaler.pkl"
-
+model_path = "./MachineLearning/Binary_Models/mlp_10_10_model.pkl"
+scaler_path = "./MachineLearning/Binary_Models/scaler.pkl"
 # MQTT configuration
 mqtt_broker = "localhost"
 mqtt_topic = "emg/sensor"
@@ -57,7 +62,7 @@ MQTT_PASSWORD = "Dimitris"
 mqtt_client = mqtt.Client()
 mqtt_client.username_pw_set(MQTT_USER, MQTT_PASSWORD)
 
-window_size = 1  # seconds
+window_size = 1.3  # seconds
 sample_rate = 1860  # Hz
 buffer_size = int(window_size * sample_rate)
 
@@ -66,7 +71,7 @@ scaler = StandardScaler()
 
 
 # Load the model
-def load_model(model_path: str, scaler_path: str):
+def load_model(model_path: str, scaler_path: str) -> None:
     global model, scaler
     try:
         # Load the model
@@ -104,14 +109,13 @@ def on_message(client, userdata, message):
     # Decode the incoming message and convert it to an integer
     data = int(message.payload.decode("utf-8"))
     buffer.append(data)
-    # Check if the buffer has reached the required size
     if len(buffer) > buffer_size:
         # Perform classification when buffer is full
         prediction = classify_data(buffer)
         latest_classification = map_class_to_info(prediction)
         # Clear the buffer after classification
         buffer.clear()
-        print(f"Updated classification: {latest_classification}")
+        # print(f"Updated classification: {latest_classification}")
 
 
 # Configure MQTT client
@@ -133,12 +137,15 @@ def extract_features(buffer):
     mav = np.mean(np.abs(buffer))
     wl = np.sum(np.abs(np.diff(buffer)))
     features = np.array([rms, mav, wl]).reshape(1, -1)
+
     if scaler.mean_ is None or scaler.scale_ is None:
         print("Scaler is not fitted.")
         return None
-    # Scale the features
-    scaled_features = scaler.transform(features)
-    return scaled_features[0]
+
+    # Use DataFrame to match the scaler's expected feature names
+    feature_df = pd.DataFrame(features, columns=["RMS", "MAV", "WL"])
+    scaled_features = scaler.transform(feature_df)
+    return [scaled_features[0]]
 
 
 # Classify data based on features
@@ -150,7 +157,7 @@ def classify_data(buffer):
 
 # Map prediction to class info
 def map_class_to_info(prediction):
-    return class_mapping.get(prediction)
+    return class_mapping.get(prediction[0], {})
 
 
 # Read HTML content from file

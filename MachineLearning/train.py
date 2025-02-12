@@ -61,7 +61,6 @@ def initialize_csv():
         print(f"CSV file already exists: {CSV_FILE}")
 
 
-# Collect data for a label and write to CSV after {Minites} Minites
 def collect_and_save_label(label):
     global data_buffer
     labeled_data = []
